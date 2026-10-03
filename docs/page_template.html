@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Login Risk Engine</title>
+<meta name="description" content="Case study: a hybrid account-takeover detection engine that scores every login 0-100 and decides allow, step-up MFA or block.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column (~68ch) with wide breakouts for the score chart, tables and figures. */
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --ink: #0e1726;
+  --ink-2: #47536a;
+  --muted: #76829a;
+  --line: #dce2eb;
+  --accent: #1f5fbf;
+  --accent-soft: #e3edfb;
+  --tier-low: #c9dcf5;
+  --tier-med: #6da7ec;
+  --tier-high: #104281;
+  --dot: #0e1726;
+  --range: #47536a;
+  --code-bg: #0f1724;
+  --code-ink: #d6e2f3;
+  --code-key: #8fbcf5;
+  --code-str: #f0b27a;
+  --figure-bg: #fcfcfb;
+  --font-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --step--1: 0.84rem;
+  --step-0: 1.02rem;
+  --step-1: 1.25rem;
+  --step-2: 1.6rem;
+  --step-3: clamp(2.1rem, 5.2vw, 3.4rem);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1118; --surface: #141b25; --ink: #e8edf4; --ink-2: #a9b4c4; --muted: #7d889b;
+    --line: #253042; --accent: #6da7ec; --accent-soft: #16263d;
+    --tier-low: #1d3352; --tier-med: #2f6db8; --tier-high: #9ec5f4;
+    --dot: #ffffff; --range: #a9b4c4; --code-bg: #0a0f16; --figure-bg: #fcfcfb;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1118; --surface: #141b25; --ink: #e8edf4; --ink-2: #a9b4c4; --muted: #7d889b;
+  --line: #253042; --accent: #6da7ec; --accent-soft: #16263d;
+  --tier-low: #1d3352; --tier-med: #2f6db8; --tier-high: #9ec5f4;
+  --dot: #ffffff; --range: #a9b4c4; --code-bg: #0a0f16; --figure-bg: #fcfcfb;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: var(--step-0); line-height: 1.62;
+  padding-inline: 20px; padding-block: 0;
+}
+img { max-width: 100%; height: auto; display: block; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+.page { max-width: 1040px; margin-inline: auto; padding-block: 56px 72px; display: grid; gap: 72px; }
+.col { max-width: 68ch; }
+section { display: grid; gap: 20px; min-width: 0; }
+
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: var(--step-3); line-height: 1.04; font-weight: 800; letter-spacing: -0.025em; max-width: 18ch; }
+h2 { font-size: var(--step-2); line-height: 1.15; font-weight: 700; }
+h3 { font-size: var(--step-1); line-height: 1.25; font-weight: 700; }
+p { margin: 0; }
+.lede { font-size: var(--step-1); line-height: 1.5; color: var(--ink-2); max-width: 60ch; }
+.label {
+  font-family: var(--font-mono); font-size: var(--step--1); letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+}
+.prose { display: grid; gap: 14px; max-width: 68ch; color: var(--ink); }
+.prose p { color: var(--ink); }
+.muted { color: var(--ink-2); }
+code, .mono { font-family: var(--font-mono); font-size: 0.92em; }
+
+/* ---------- hero ---------- */
+.hero { display: grid; gap: 22px; }
+.meta {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 18px 28px;
+  padding-top: 22px; border-top: 1px solid var(--line); margin-top: 8px;
+}
+.meta div { display: grid; gap: 4px; min-width: 0; align-content: start; }
+.meta dd { margin: 0; color: var(--ink); }
+.meta dt { margin: 0; }
+.notice {
+  display: flex; gap: 10px; align-items: baseline; padding: 12px 16px; border-radius: 10px;
+  background: var(--accent-soft); color: var(--ink); font-size: var(--step--1); max-width: 76ch;
+}
+.notice strong { font-family: var(--font-mono); font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+.links { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-decoration: none;
+  font-weight: 500; font-size: var(--step--1); font-family: var(--font-mono);
+}
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn:hover { border-color: var(--accent); }
+
+/* ---------- score scale chart (signature) ---------- */
+.scale {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  padding: 24px 24px 18px; display: grid; gap: 14px; min-width: 0;
+}
+.scale-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.scale-head p { color: var(--ink-2); font-size: var(--step--1); max-width: 62ch; }
+.scale-grid { display: grid; grid-template-columns: minmax(130px, 210px) 1fr; column-gap: 18px; row-gap: 0; }
+.scale-grid .axis-spacer { grid-column: 1; }
+.track-wrap { position: relative; min-width: 0; }
+.bands { display: grid; position: absolute; inset: 0; pointer-events: none; }
+.band { position: absolute; top: 0; bottom: 0; }
+.band.b-low { background: transparent; }
+.band.b-med { background: color-mix(in srgb, var(--tier-med) 16%, transparent); }
+.band.b-high { background: color-mix(in srgb, var(--tier-high) 22%, transparent); }
+.band-label {
+  position: absolute; top: 6px; font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-2); white-space: nowrap;
+}
+.row-name { font-size: var(--step--1); padding-block: 13px; color: var(--ink); line-height: 1.25; display: grid; align-content: center; }
+.row-name small { display: block; color: var(--muted); font-family: var(--font-mono); font-size: 0.72rem; }
+.row-name.attack { font-weight: 600; }
+.row-track { position: relative; height: 100%; min-height: 50px; }
+.row-track .rng { position: absolute; top: 50%; height: 4px; margin-top: -2px; background: var(--range); border-radius: 2px; opacity: 0.55; }
+.row-track .mid {
+  position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
+  background: var(--dot); box-shadow: 0 0 0 2px var(--surface);
+}
+.row-track .val { position: absolute; top: 50%; transform: translate(10px, -50%); font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-2); white-space: nowrap; }
+.row-track .val.left { transform: translate(calc(-100% - 10px), -50%); }
+.rows-sep { grid-column: 1 / -1; border-top: 1px dashed var(--line); }
+.axis { position: relative; height: 22px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); border-top: 1px solid var(--line); }
+.axis span { position: absolute; top: 4px; transform: translateX(-50%); }
+.axis span:first-child { transform: none; }
+.axis span:last-child { transform: translateX(-100%); }
+.scale-legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.78rem; color: var(--ink-2); }
+.scale-legend i { display: inline-block; vertical-align: middle; margin-right: 6px; }
+.k-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--dot); }
+.k-rng { width: 22px; height: 4px; border-radius: 2px; background: var(--range); opacity: 0.55; }
+
+/* ---------- stats ---------- */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.stat { background: var(--surface); padding: 20px 22px; display: grid; gap: 6px; align-content: start; }
+.stat .v { font-family: var(--font-display); font-size: 2.15rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+.stat .d { font-size: var(--step--1); color: var(--ink-2); line-height: 1.45; }
+
+/* ---------- pipeline ---------- */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; counter-reset: step; }
+.steps li { counter-increment: step; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); display: grid; gap: 8px; align-content: start; min-width: 0; }
+.steps li::before { content: counter(step); font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent); }
+.steps h3 { font-size: 1.05rem; }
+.steps p { font-size: var(--step--1); color: var(--ink-2); line-height: 1.5; }
+
+/* ---------- tables ---------- */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: var(--step--1); min-width: 640px; }
+th, td { padding: 11px 14px; text-align: right; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; white-space: normal; vertical-align: bottom; }
+tbody tr:last-child td { border-bottom: 0; }
+tr.final td { font-weight: 600; background: var(--accent-soft); }
+td.ci { color: var(--muted); font-size: 0.78rem; }
+.cost-table { min-width: 0; }
+.cost-table td, .cost-table th { white-space: normal; text-align: left; }
+
+/* ---------- figures ---------- */
+.figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 22px; }
+figure { margin: 0; display: grid; gap: 10px; min-width: 0; align-content: start; }
+figure .frame { background: var(--figure-bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+figcaption { font-size: var(--step--1); color: var(--ink-2); max-width: 62ch; }
+
+/* ---------- findings ---------- */
+.findings { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; max-width: 76ch; border-top: 1px solid var(--line); }
+.findings li { display: grid; grid-template-columns: 9.5rem 1fr; gap: 6px 22px; padding-block: 18px; border-bottom: 1px solid var(--line); }
+.findings .k { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; line-height: 1.1; color: var(--accent); }
+.findings h3 { font-size: 1.05rem; margin-bottom: 4px; }
+.findings p { color: var(--ink-2); font-size: 0.96rem; }
+
+/* ---------- code ---------- */
+pre {
+  margin: 0; overflow-x: auto; background: var(--code-bg); color: var(--code-ink); border-radius: 12px;
+  padding: 18px 20px; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.6;
+}
+pre .k { color: var(--code-key); }
+pre .s { color: var(--code-str); }
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 22px; align-items: start; }
+.split > * { min-width: 0; }
+.reasons { display: grid; gap: 10px; }
+.reason { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: baseline; font-size: var(--step--1); }
+.reason code { font-size: 0.76rem; padding: 2px 7px; border-radius: 5px; background: var(--accent-soft); color: var(--ink); white-space: nowrap; }
+.reason span { color: var(--ink-2); }
+
+ul.plain { margin: 0; padding-left: 1.1rem; display: grid; gap: 8px; max-width: 70ch; }
+ul.plain li { color: var(--ink); }
+footer { border-top: 1px solid var(--line); padding-top: 24px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: var(--step--1); color: var(--ink-2); }
+
+@media (max-width: 640px) {
+  .page { padding-block: 32px 48px; gap: 56px; }
+  .scale { padding: 18px 14px 14px; }
+  .scale-grid { grid-template-columns: 104px 1fr; column-gap: 10px; }
+  .band-label { display: none; }
+  .findings li { grid-template-columns: 1fr; }
+  .stat .v { font-size: 1.9rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .row-track .mid { transition: transform .15s ease; }
+  .row-track:hover .mid { transform: scale(1.25); }
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+  <header class="hero">
+    <span class="label">Case study · Fraud &amp; security data science</span>
+    <h1>Catching account takeovers at the moment of login</h1>
+    <p class="lede">A risk engine that scores every login from 0 to 100 and decides on the spot: let the user in, ask for MFA, or block the session and alert the SOC. It combines detection rules, anomaly detection and a supervised model, and its thresholds come from a cost model that states the business's risk tolerance.</p>
+    <div class="notice"><strong>Synthetic data</strong><span>{{events}} simulated login events from {{users}} users over four months, with injected credential-stuffing, phishing and brute-force campaigns. The figures describe this simulation, not a production system.</span></div>
+    <div class="links">
+      <a class="btn primary" href="{{repo_url}}">View code on GitHub</a>
+      <a class="btn" href="{{repo_url}}/blob/main/notebooks/01_walkthrough.ipynb">Walkthrough notebook</a>
+      <a class="btn" href="{{repo_url}}/blob/main/docs/control_mapping.md">NIST / ISO 27001 mapping</a>
+    </div>
+    <dl class="meta">
+      <div><dt class="label">Role</dt><dd>Solo project: data, features, models, policy, reporting</dd></div>
+      <div><dt class="label">Stack</dt><dd>Python, pandas, scikit-learn, matplotlib</dd></div>
+      <div><dt class="label">Techniques</dt><dd>Isolation Forest, gradient boosting, stacking, cost-sensitive thresholds</dd></div>
+      <div><dt class="label">Output</dt><dd>ECS JSON alerts for Elastic, Splunk or QRadar</dd></div>
+    </dl>
+  </header>
+
+  <section aria-labelledby="scale-title">
+    <div class="scale">
+      <div class="scale-head">
+        <h2 id="scale-title" style="font-size:1.2rem">Where each kind of login lands on the risk scale</h2>
+        <p>Test period. Dot = median score, bar = 10th–90th percentile. Every +25 points means a takeover is 10× more likely.</p>
+      </div>
+      <div class="scale-grid">
+        {{scale_rows}}
+        <div class="axis-spacer"></div>
+        <div class="axis"><span>0</span><span style="left:25%">25</span><span style="left:50%">50</span><span style="left:75%">75</span><span style="left:100%">100</span></div>
+      </div>
+      <div class="scale-legend">
+        <span><i class="k-dot"></i>median</span>
+        <span><i class="k-rng"></i>10th–90th percentile</span>
+        <span>Shaded bands: allow (&lt; {{t_mfa}}) · step-up MFA ({{t_mfa}}–{{t_block}}) · block (≥ {{t_block}})</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="results-title">
+    <span class="label">Results on three unseen weeks</span>
+    <h2 id="results-title">Most takeovers are stopped, and real customers rarely notice</h2>
+    <div class="stats">
+      <div class="stat"><span class="label">Takeovers intercepted</span><span class="v">{{intercepted}}%</span><span class="d">{{blocked}}% blocked outright, the rest sent to MFA. 95% CI {{intercepted_ci}}.</span></div>
+      <div class="stat"><span class="label">Real customers blocked</span><span class="v">{{legit_blocked}}%</span><span class="d">and {{legit_mfa}}% asked for MFA, inside a 3% friction budget.</span></div>
+      <div class="stat"><span class="label">SOC alerts per day</span><span class="v">{{alerts_day}}</span><span class="d">{{alert_precision}}% of them are real takeovers.</span></div>
+      <div class="stat"><span class="label">Expected cost vs rules</span><span class="v">−{{cost_cut}}%</span><span class="d">Rp {{cost_hybrid}} jt vs Rp {{cost_rules}} jt over the test period (no control: Rp {{cost_none}} jt).</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="problem-title" class="col">
+    <span class="label">The problem</span>
+    <h2 id="problem-title">The password is correct, so the login looks normal</h2>
+    <div class="prose">
+      <p>In an account takeover the attacker already has the victim's real credentials, from phishing, a breach dump replayed at scale (credential stuffing), or guessing. Password checks pass. What gives the attacker away is behaviour: a device the account has never used, a datacenter network, a jump from Surabaya to Moscow in two hours, a burst of failed attempts across many accounts.</p>
+      <p>The difficult part is the legitimate traffic that looks just as strange: people on holiday, privacy-VPN users, new phones, and thousands of subscribers sharing a single mobile-carrier IP. A useful engine has to tell these apart, explain every decision to an analyst, and give auditors evidence that the control works.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="approach-title">
+    <span class="label">Approach</span>
+    <h2 id="approach-title">From raw logs to a decision in five steps</h2>
+    <ol class="steps">
+      <li><h3>Point-in-time features</h3><p>27 signals per login, each computed only from earlier events: new device, country or ASN for this user, travel speed, hour deviation, failed-login pressure per account, IP and ASN. A unit test proves future data never leaks into a past feature.</p></li>
+      <li><h3>Three detectors</h3><p>Nine transparent rules for known patterns, an Isolation Forest that needs no labels, and gradient boosting trained on confirmed takeovers.</p></li>
+      <li><h3>One calibrated score</h3><p>A logistic stacker, fitted on out-of-fold predictions in time order, blends the three into a probability. That probability is mapped to a log-scale 0–100 score.</p></li>
+      <li><h3>Thresholds from cost</h3><p>Grid search for the MFA and block cut-offs that minimise expected fraud loss + customer friction + analyst time, with a cap on how many real users get challenged.</p></li>
+      <li><h3>Alerts &amp; evidence</h3><p>HIGH decisions go to the SIEM as ECS JSON with reason codes. A separate detector rate-limits IPs that spray many accounts. KPIs are recomputed on every run as audit evidence.</p></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="cmp-title">
+    <span class="label">Comparison</span>
+    <h2 id="cmp-title">Same policy machinery, four detectors</h2>
+    <p class="muted col">Each detector had its thresholds tuned on the validation weeks and then frozen for the test weeks ({{test_ato}} takeovers among {{test_rows}} successful logins).</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Detector</th><th>PR-AUC</th><th>95% CI</th><th>Takeovers intercepted</th><th>Legit asked for MFA</th><th>Alerts / day</th><th>Alert precision</th><th>Expected cost</th></tr></thead>
+        <tbody>{{comparison_rows}}</tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="fig-title">
+    <span class="label">Evidence</span>
+    <h2 id="fig-title">What the charts show</h2>
+    <div class="figs">
+      <figure><div class="frame"><img src="{{img:pr_curves.png}}" alt="Precision-recall curves: gradient boosting and hybrid near PR-AUC 0.91, rules 0.38, Isolation Forest 0.41." loading="lazy"></div><figcaption>Rules and anomaly detection alone stay below 0.45 PR-AUC; the supervised and hybrid scores sit above 0.9.</figcaption></figure>
+      <figure><div class="frame"><img src="{{img:cost_comparison.png}}" alt="Expected cost bars by detector, hybrid lowest with the gradient boosting model." loading="lazy"></div><figcaption>Expected cost under one shared cost model: fraud losses, customer friction and analyst time.</figcaption></figure>
+      <figure><div class="frame"><img src="{{img:threshold_cost_surface.png}}" alt="Heatmap of expected cost across MFA and block thresholds with the chosen point marked." loading="lazy"></div><figcaption>Picking the two thresholds is picking a risk tolerance. The cheapest feasible point is marked.</figcaption></figure>
+      <figure><div class="frame"><img src="{{img:outcomes_by_scenario.png}}" alt="Stacked bars of blocked, MFA and missed takeovers for each attack type." loading="lazy"></div><figcaption>Takeovers launched from inside Indonesia are the hardest: {{nonblocked_phrase}} came from Indonesian networks.</figcaption></figure>
+    </div>
+  </section>
+
+  <section aria-labelledby="learn-title">
+    <span class="label">Findings</span>
+    <h2 id="learn-title">What I learned</h2>
+    <ul class="findings">
+      <li><span class="k">{{r01_prec}}%</span><div><h3>Impossible-travel rules are mostly noise</h3><p>The classic rule fires about {{r01_day}} times a day at {{r01_prec}}% precision. VPN users and travellers switching between roaming and hotel Wi-Fi trip it constantly. "Odd login hour" is worse: about {{r09_day}} times a day at {{r09_prec}}% precision.</p></div></li>
+      <li><span class="k">{{rob_hybrid}}%</span><div><h3>The hybrid earns its place when labels are missing</h3><p>On known attacks it ties the supervised model. When credential-stuffing labels were hidden from training, recall on that attack was {{rob_gbm}}% for gradient boosting alone and {{rob_hybrid}}% for the hybrid; the label-free Isolation Forest reached {{rob_iso}}%. The sample is small (n = {{rob_n}}), so I treat this as a direction, not a result.</p></div></li>
+      <li><span class="k">0</span><div><h3>Never hard-block a mobile carrier IP</h3><p>Attackers route through residential proxies and CGNAT addresses shared with real customers. Blocking only hosting IPs for 24 hours, and rate-limiting the rest, hit {{ip_hit}} of {{ip_total}} attack attempts and hard-blocked {{ip_legit_blocked}} real logins.</p></div></li>
+      <li><span class="k">10×</span><div><h3>A log-scale score is easier to explain</h3><p>"Every 25 points is ten times more likely" is something a fraud manager or auditor can reason with. A raw probability of 0.0003 is not.</p></div></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="alert-title">
+    <span class="label">SIEM output</span>
+    <h2 id="alert-title">Every block comes with its reasons</h2>
+    <div class="split">
+      <pre aria-label="Example ECS alert">{{alert_json}}</pre>
+      <div class="reasons">
+        <p class="muted" style="font-size:.95rem">Reason codes are ordered by weight, so an L1 analyst sees the strongest evidence first and follows the matching step in the alert playbook.</p>
+        {{reason_rows}}
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="gov-title">
+    <span class="label">Governance</span>
+    <h2 id="gov-title">Built to be audited</h2>
+    <div class="table-wrap">
+      <table class="cost-table">
+        <thead><tr><th>Part of the engine</th><th>NIST CSF 2.0</th><th>ISO/IEC 27001:2022</th></tr></thead>
+        <tbody>
+          <tr><td>Behavioural features &amp; correlation across user, IP and ASN</td><td>DE.AE-02, DE.AE-03</td><td>A.8.16 Monitoring activities</td></tr>
+          <tr><td>Risk-based step-up MFA and blocking</td><td>PR.AA-03, RS.MI-01</td><td>A.8.5 Secure authentication</td></tr>
+          <tr><td>Cost model as documented risk tolerance</td><td>GV.RM-02, ID.RA-04</td><td>Clause 6.1.2 risk criteria</td></tr>
+          <tr><td>ECS alerts, playbook, closure codes, case timeline</td><td>DE.AE-06, DE.AE-08, RS.AN-03</td><td>A.5.25 – A.5.28</td></tr>
+          <tr><td>Data minimisation, retention, human review of blocks</td><td>GV.OC-03</td><td>A.5.34 Privacy &amp; PII (GDPR, UU PDP)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="limits-title" class="col">
+    <span class="label">Limitations</span>
+    <h2 id="limits-title">What I would check before trusting these numbers</h2>
+    <ul class="plain">
+      <li>Simulated attackers are simpler than real ones and do not adapt to the controls.</li>
+      <li>The test window has only {{test_ato}} takeovers, so the confidence intervals are wide.</li>
+      <li>Labels here are perfect and immediate. Real labels arrive late and incomplete, through customer reports and chargebacks.</li>
+      <li>Next steps: run on the public RBA dataset, add device-reputation and graph features, and set up weekly drift monitoring with threshold recalibration.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>Addin · Data Scientist</span>
+    <span><a href="{{repo_url}}">Source code</a> · MIT licence</span>
+  </footer>
+</main>
+</body>
+</html>

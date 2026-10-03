@@ -1,0 +1,347 @@
+{
+  "dataset": {
+    "events": 332869,
+    "users": 2500,
+    "successful_logins": 299133,
+    "failed_logins": 33736,
+    "ato_events": 651,
+    "attack_attempts": 9470,
+    "start": "2026-05-01",
+    "end": "2026-08-28"
+  },
+  "splits": {
+    "train": {
+      "from": "2026-05-15",
+      "to": "2026-07-14",
+      "rows": 151964,
+      "ato": 405
+    },
+    "valid": {
+      "from": "2026-07-15",
+      "to": "2026-08-07",
+      "rows": 60296,
+      "ato": 136
+    },
+    "test": {
+      "from": "2026-08-08",
+      "to": "2026-08-28",
+      "rows": 52252,
+      "ato": 90
+    }
+  },
+  "cost_model_idr": {
+    "missed_ato": 7500000,
+    "mfa_on_legit": 2500,
+    "block_on_legit": 500000,
+    "soc_review": 40000,
+    "mfa_bypass_rate": 0.15
+  },
+  "chosen_thresholds": {
+    "mfa": 14.0,
+    "block": 93.0
+  },
+  "stacker_weights": {
+    "ml_logit": 1.006,
+    "anomaly_pct": 0.734,
+    "rule_points/100": 0.1,
+    "intercept": 0.682
+  },
+  "test_comparison": {
+    "Rules only": {
+      "thresholds": {
+        "mfa": 10.5,
+        "block": 60.5
+      },
+      "events": 52252,
+      "ato_events": 90,
+      "pr_auc": 0.3781,
+      "roc_auc": 0.9271,
+      "ato_blocked_pct": 32.2,
+      "ato_challenged_pct": 43.3,
+      "ato_missed_pct": 24.4,
+      "ato_intercepted_pct": 75.6,
+      "legit_mfa_rate_pct": 0.987,
+      "legit_blocked_rate_pct": 0.0211,
+      "high_alerts_per_day": 1.9,
+      "high_alert_precision_pct": 72.5,
+      "expected_cost_idr": 217262500.0,
+      "cost_no_control_idr": 675000000.0,
+      "pr_auc_ci95": [
+        0.294,
+        0.485
+      ],
+      "ato_intercepted_pct_ci95": [
+        66.667,
+        84.9
+      ],
+      "ato_blocked_pct_ci95": [
+        22.629,
+        42.938
+      ]
+    },
+    "Isolation Forest only": {
+      "thresholds": {
+        "mfa": 98.0,
+        "block": 100.0
+      },
+      "events": 52252,
+      "ato_events": 90,
+      "pr_auc": 0.4133,
+      "roc_auc": 0.9791,
+      "ato_blocked_pct": 0.0,
+      "ato_challenged_pct": 83.3,
+      "ato_missed_pct": 16.7,
+      "ato_intercepted_pct": 83.3,
+      "legit_mfa_rate_pct": 1.856,
+      "legit_blocked_rate_pct": 0.0,
+      "high_alerts_per_day": 0.0,
+      "high_alert_precision_pct": 0.0,
+      "expected_cost_idr": 199295000.0,
+      "cost_no_control_idr": 675000000.0,
+      "pr_auc_ci95": [
+        0.324,
+        0.517
+      ],
+      "ato_intercepted_pct_ci95": [
+        75.862,
+        90.5
+      ],
+      "ato_blocked_pct_ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    "Gradient boosting only": {
+      "thresholds": {
+        "mfa": 0.5,
+        "block": 84.5
+      },
+      "events": 52252,
+      "ato_events": 90,
+      "pr_auc": 0.9092,
+      "roc_auc": 0.9827,
+      "ato_blocked_pct": 81.1,
+      "ato_challenged_pct": 15.6,
+      "ato_missed_pct": 3.3,
+      "ato_intercepted_pct": 96.7,
+      "legit_mfa_rate_pct": 1.503,
+      "legit_blocked_rate_pct": 0.0,
+      "high_alerts_per_day": 3.5,
+      "high_alert_precision_pct": 100.0,
+      "expected_cost_idr": 43130000.0,
+      "cost_no_control_idr": 675000000.0,
+      "pr_auc_ci95": [
+        0.856,
+        0.952
+      ],
+      "ato_intercepted_pct_ci95": [
+        92.99,
+        100.0
+      ],
+      "ato_blocked_pct_ci95": [
+        72.727,
+        88.387
+      ]
+    },
+    "Hybrid (stacked)": {
+      "thresholds": {
+        "mfa": 14.0,
+        "block": 93.0
+      },
+      "events": 52252,
+      "ato_events": 90,
+      "pr_auc": 0.9098,
+      "roc_auc": 0.9928,
+      "ato_blocked_pct": 81.1,
+      "ato_challenged_pct": 15.6,
+      "ato_missed_pct": 3.3,
+      "ato_intercepted_pct": 96.7,
+      "legit_mfa_rate_pct": 1.568,
+      "legit_blocked_rate_pct": 0.0038,
+      "high_alerts_per_day": 3.6,
+      "high_alert_precision_pct": 97.3,
+      "expected_cost_idr": 44295000.0,
+      "cost_no_control_idr": 675000000.0,
+      "pr_auc_ci95": [
+        0.856,
+        0.952
+      ],
+      "ato_intercepted_pct_ci95": [
+        92.99,
+        100.0
+      ],
+      "ato_blocked_pct_ci95": [
+        72.727,
+        88.387
+      ]
+    }
+  },
+  "test_by_scenario": {
+    "brute_force": {
+      "HIGH": 1,
+      "MEDIUM": 0,
+      "LOW": 0
+    },
+    "credential_stuffing": {
+      "HIGH": 26,
+      "MEDIUM": 3,
+      "LOW": 1
+    },
+    "targeted_ato": {
+      "HIGH": 46,
+      "MEDIUM": 11,
+      "LOW": 2
+    }
+  },
+  "rule_coverage_test": [
+    {
+      "rule": "R01_IMPOSSIBLE_TRAVEL",
+      "points": 40,
+      "description": "Implied travel speed > 900 km/h over > 500 km since last login",
+      "fires_per_day": 8.1,
+      "precision_pct": 10.5,
+      "ato_coverage_pct": 20.0
+    },
+    {
+      "rule": "R02_NEW_COUNTRY_NEW_DEVICE",
+      "points": 35,
+      "description": "First login from this country AND on an unseen device",
+      "fires_per_day": 1.2,
+      "precision_pct": 100.0,
+      "ato_coverage_pct": 27.8
+    },
+    {
+      "rule": "R03_AUTOMATION_UA",
+      "points": 50,
+      "description": "User-agent is a script/headless browser",
+      "fires_per_day": 0.0,
+      "precision_pct": 100.0,
+      "ato_coverage_pct": 1.1
+    },
+    {
+      "rule": "R04_FAILED_BURST_USER",
+      "points": 35,
+      "description": ">= 5 failed logins on this account in the last hour",
+      "fires_per_day": 0.6,
+      "precision_pct": 7.7,
+      "ato_coverage_pct": 1.1
+    },
+    {
+      "rule": "R05_IP_SPRAY",
+      "points": 40,
+      "description": "Source IP tried >= 5 accounts in 24h with >= 50% failures",
+      "fires_per_day": 2.2,
+      "precision_pct": 13.0,
+      "ato_coverage_pct": 6.7
+    },
+    {
+      "rule": "R06_HOSTING_ASN",
+      "points": 20,
+      "description": "Source is a hosting / VPN provider",
+      "fires_per_day": 19.3,
+      "precision_pct": 7.9,
+      "ato_coverage_pct": 35.6
+    },
+    {
+      "rule": "R07_NEW_DEVICE_NEW_NETWORK",
+      "points": 20,
+      "description": "Unseen device on an unseen network (ASN)",
+      "fires_per_day": 1.7,
+      "precision_pct": 100.0,
+      "ato_coverage_pct": 38.9
+    },
+    {
+      "rule": "R08_RARE_COUNTRY",
+      "points": 15,
+      "description": "Country accounts for < 0.1% of platform logins",
+      "fires_per_day": 2.3,
+      "precision_pct": 63.3,
+      "ato_coverage_pct": 34.4
+    },
+    {
+      "rule": "R09_ODD_HOUR",
+      "points": 10,
+      "description": "> 6h away from the user's usual login hour (established users)",
+      "fires_per_day": 265.2,
+      "precision_pct": 0.6,
+      "ato_coverage_pct": 37.8
+    }
+  ],
+  "ip_detector_test": {
+    "ttl_hours": 24,
+    "attack_ips_seen": 91,
+    "attack_ips_flagged": 45,
+    "ips_flagged_never_used_by_attackers": 5,
+    "attack_attempts_total": 1199,
+    "attack_attempts_blocked": 204,
+    "attack_attempts_captcha": 128,
+    "ato_events_total": 90,
+    "ato_prevented_by_block": 4,
+    "ato_hit_captcha": 2,
+    "legit_logins_total": 52162,
+    "legit_logins_blocked": 0,
+    "legit_logins_captcha": 34,
+    "legit_logins_hit_if_all_ips_hard_blocked": 34
+  },
+  "robustness_unseen_attack": {
+    "hidden_attack": "credential_stuffing",
+    "legit_challenge_budget_pct": 2.0,
+    "novel_ato_events": 30,
+    "Gradient boosting only": 86.7,
+    "Isolation Forest only": 93.3,
+    "Rules only": 80.0,
+    "Hybrid (stacked)": 90.0
+  },
+  "top_features": [
+    {
+      "feature": "dist_first_km",
+      "importance": 0.4981,
+      "std": 0.0082
+    },
+    {
+      "feature": "new_ip",
+      "importance": 0.1469,
+      "std": 0.0075
+    },
+    {
+      "feature": "country_global_share",
+      "importance": 0.1027,
+      "std": 0.0029
+    },
+    {
+      "feature": "new_platform",
+      "importance": 0.0254,
+      "std": 0.0002
+    },
+    {
+      "feature": "ip_users_prior",
+      "importance": 0.0204,
+      "std": 0.0027
+    },
+    {
+      "feature": "hour_deviation",
+      "importance": 0.02,
+      "std": 0.0025
+    },
+    {
+      "feature": "new_city",
+      "importance": 0.0108,
+      "std": 0.0015
+    },
+    {
+      "feature": "new_device",
+      "importance": 0.0097,
+      "std": 0.0002
+    },
+    {
+      "feature": "dist_prev_km",
+      "importance": 0.0083,
+      "std": 0.0002
+    },
+    {
+      "feature": "hours_since_prev",
+      "importance": 0.0077,
+      "std": 0.0018
+    }
+  ]
+}
